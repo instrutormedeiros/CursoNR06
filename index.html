@@ -1,0 +1,697 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curso de NR-6 - Equipamentos de Proteção Individual (EPI)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            background-color: #F3F4F6;
+            scroll-behavior: smooth;
+        }
+        .sidebar {
+            position: sticky;
+            top: 0.5rem;
+            max-height: calc(100vh - 5rem);
+            overflow-y: auto;
+            background-color: #FFFFFF;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1.2em;
+        }
+        #content-area {
+            transition: opacity 0.3s ease;
+        }
+        #content-area.fade {
+            opacity: 0;
+        }
+        .quiz-option {
+            cursor: pointer;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+            background-color: #e5e7eb;
+            border: 1px solid #d1d5db;
+        }
+        .quiz-option:hover {
+            background-color: #d1d5db;
+        }
+        .quiz-option.selected {
+            background-color: #3b82f6 !important;
+            color: #ffffff !important;
+            border-color: #2563eb !important;
+        }
+        .quiz-option.correct {
+            background-color: #22c55e !important;
+            color: #ffffff !important;
+            border-color: #16a34a !important;
+        }
+        .quiz-option.incorrect {
+            background-color: #ef4444 !important;
+            color: #ffffff !important;
+            border-color: #dc2626 !important;
+        }
+        .quiz-option:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .explanation {
+            padding: 0.5rem;
+            margin-top: 0.25rem;
+            margin-bottom: 1rem;
+            border-radius: 0.25rem;
+            background-color: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+        .progress-container {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: #fff;
+            padding: 0.5rem 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .progress-bar {
+            height: 1rem;
+            background: #f97316;
+            transition: width 0.3s ease;
+            border-radius: 0.25rem;
+        }
+        .action-button {
+            background-color: #F97316;
+            color: white;
+            font-weight: 600;
+            padding: 0.5rem 1.5rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s ease;
+        }
+        .action-button:hover {
+            background-color: #EA580C;
+        }
+        .action-button:disabled {
+            background: #d1d5db !important;
+            color: #6b7280;
+            cursor: not-allowed;
+        }
+        #congratulations-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+            text-align: center;
+            max-width: 28rem;
+            pointer-events: none;
+        }
+        #congratulations-message.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #certificate-form-container {
+            display: none;
+        }
+        #certificate-form-container.show {
+            display: block;
+        }
+        #content-area h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #1E3A8A;
+            display: flex;
+            align-items: center;
+        }
+        #content-area h4 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #1E40AF;
+        }
+        #content-area p {
+            margin-bottom: 1rem;
+            color: #4B5563;
+            line-height: 1.625;
+        }
+        #content-area ul {
+            list-style-type: disc;
+            margin-left: 1.25rem;
+            margin-bottom: 1rem;
+            color: #4B5563;
+        }
+        .social-link:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                position: relative;
+                max-height: none;
+                width: 100%;
+                margin-bottom: 1rem;
+            }
+            .flex-col.md\:flex-row {
+                flex-direction: column;
+            }
+            .social-links {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+    <div class="progress-container">
+        <div class="container mx-auto px-6">
+            <p class="text-sm font-semibold mb-1">Progresso dos Módulos: <span id="progress-text">0%</span></p>
+            <div class="w-full bg-gray-200 rounded">
+                <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <header class="bg-gradient-to-r from-blue-800 to-blue-600 text-white py-4 shadow-md">
+        <div class="container mx-auto px-6">
+            <h1 class="text-xl sm:text-2xl md:text-3xl font-bold">Curso de NR-6: Equipamentos de Proteção Individual (EPI)</h1>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 py-8 flex flex-col md:flex-row gap-6">
+        <aside class="md:w-1/3">
+            <div class="sidebar">
+                <h2 class="text-xl font-semibold mb-3 flex items-center text-gray-700">
+                    <i class="fas fa-book-open w-6 h-6 mr-2 text-orange-500"></i>
+                    Selecionar Módulo
+                </h2>
+                <select id="module-selector" class="w-full p-3 border border-gray-300 rounded bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 text-base">
+                    <option value="">Escolha um Módulo</option>
+                </select>
+            </div>
+        </aside>
+
+        <main class="md:w-2/3 bg-white p-6 rounded-lg shadow-md">
+            <div id="content-area"></div>
+        </main>
+    </div>
+
+    <div id="congratulations-message" class="hidden">
+        <h2 class="text-2xl font-bold text-orange-600 mb-4">Parabéns!</h2>
+        <p class="text-lg mb-4">Você concluiu o curso com sucesso e foi aprovado na prova final!</p>
+        <button id="close-congrats" class="action-button">Fechar</button>
+    </div>
+
+    <footer class="bg-blue-900 text-white py-8 mt-12">
+        <div class="container mx-auto px-6 text-center">
+            <div id="certificate-form-container" class="max-w-md mx-auto mb-8 text-left bg-blue-800 p-6 rounded-lg">
+                <h3 class="text-xl font-semibold mb-3 text-white">Solicite seu Certificado</h3>
+                <p class="text-sm mb-4 text-gray-300">Preencha os campos abaixo para receber seu certificado de conclusão:</p>
+                <div class="space-y-4">
+                    <div>
+                        <label for="full-name" class="block text-sm font-medium text-gray-200">Nome Completo</label>
+                        <input type="text" id="full-name" required class="w-full p-2 border border-blue-700 rounded bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-400">
+                    </div>
+                    <div>
+                        <label for="cpf" class="block text-sm font-medium text-gray-200">CPF</label>
+                        <input type="text" id="cpf" required placeholder="123.456.789-00" class="w-full p-2 border border-blue-700 rounded bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-400">
+                    </div>
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-200">E-mail</label>
+                        <input type="email" id="email" required class="w-full p-2 border border-blue-700 rounded bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-orange-500 placeholder-gray-400">
+                    </div>
+                    <button id="submit-certificate" class="action-button w-full">Enviar Solicitação</button>
+                </div>
+            </div>
+
+            <p class="text-base mb-2">© 2019 Curso de Bombeiro Civil / Brigadista. Todos os direitos reservados.</p>
+            <div class="text-sm mb-4 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+                <span>Uniformizando profissionais desde 2019</span>
+                <a href="https://instrutormedeiros.github.io/fardamento-acampamento/" target="_blank" class="font-semibold hover:underline">MEDEIROS ARTIGOS MILITARES</a>
+            </div>
+            
+            <div class="flex justify-center gap-4 md:gap-6 social-links">
+                <a href="https://www.instagram.com/coordenadormedeiros" class="flex items-center text-gray-300 hover:text-orange-400 social-link transition-colors" target="_blank">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.332.014 7.052.072 2.95.227.228 2.996.073 7.052.014 8.332 0 8.741 0 12c0 3.259.014 3.668.072 4.948.225 4.053 2.992 6.771 7.048 6.927 1.28.058 1.689.072 4.948.072s3.668-.014 4.948-.072c4.054-.156 6.772-2.874 6.927-6.93.058-1.28.072-1.689.072-4.948s-.014-3.668-.072-4.948c-.156-4.054-2.874-6.772-6.93-6.927C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zm0 10.162a3.999 3.999 0 110-7.998 3.999 3.999 0 010 7.998zm6.406-11.845a1.44 1.44 0 11-2.88 0 1.44 1.44 0 012.88 0z"/></svg>
+                    @coordenadormedeiros
+                </a>
+                <a href="https://www.linkedin.com/in/chefemedeiros" class="flex items-center text-gray-300 hover:text-orange-400 social-link transition-colors" target="_blank">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.23 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.46c.98 0 1.77-.77 1.77-1.72V1.72C24 .77 23.21 0 22.23 0zM7.12 20.45H3.56V9.06h3.56v11.39zM5.34 7.67c-1.14 0-2.06-.92-2.06-2.06 0-1.14.92-2.06 2.06-2.06s2.06.92 2.06 2.06c0 1.14-.92 2.06-2.06 2.06zm15.11 12.78h-3.56v-5.56c0-1.33-.03-3.03-1.85-3.03-1.85 0-2.13 1.44-2.13 2.94v5.65H9.3V9.06h3.41v1.55h.05c.47-.89 1.62-1.83 3.34-1.83 3.57 0 4.23 2.35 4.23 5.41v6.26z"/></svg>
+                    chefemedeiros
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const totalModules = 10;
+        let completedModules = JSON.parse(localStorage.getItem('gateBombeiroNR6CompletedModules')) || [];
+        let quizAnswers = JSON.parse(localStorage.getItem('gateBombeiroNR6QuizAnswers')) || {};
+
+        const correctAnswers = {
+            'module1-q1': 'b', 'module1-q2': 'c', 'module1-q3': 'b',
+            'module2-q1': 'c', 'module2-q2': 'b', 'module2-q3': 'b',
+            'module3-q1': 'b', 'module3-q2': 'a', 'module3-q3': 'c',
+            'module4-q1': 'b', 'module4-q2': 'b', 'module4-q3': 'b',
+            'module5-q1': 'c', 'module5-q2': 'a', 'module5-q3': 'b',
+            'module6-q1': 'c', 'module6-q2': 'b', 'module6-q3': 'b',
+            'module7-q1': 'c', 'module7-q2': 'b', 'module7-q3': 'c',
+            'module8-q1': 'b', 'module8-q2': 'b', 'module8-q3': 'b',
+            'module9-q1': 'b', 'module9-q2': 'b', 'module9-q3': 'b',
+            'module10-q1': 'b', 'module10-q2': 'c', 'module10-q3': 'b',
+        };
+
+        const moduleContent = {
+            initial: { 
+                title: "Bem-vindo ao Curso de NR-6!", 
+                iconClass: "fas fa-shield-alt", 
+                content: `<p class="text-gray-700 mb-3">Seu corpo é sua principal ferramenta. Aprenda a protegê-lo com a mais alta performance. Em um resgate, o bombeiro civil é a linha de frente contra o perigo.</p><p class="text-gray-700 mb-3">A Norma Regulamentadora 6 (NR-6) é sua aliada mais importante, definindo cada Equipamento de Proteção Individual (EPI) que garante sua integridade física e permite que você se concentre no que mais importa: salvar vidas.</p><p class="text-gray-700 mb-3">Este curso teórico aprofundado sobre a NR-6 capacita você a selecionar, utilizar e conservar seus EPIs de forma estratégica. Selecione um módulo na barra lateral para começar.</p>` 
+            },
+            module1: { 
+                id: "module1", 
+                title: "1. Introdução à NR-6: O EPI como Última Barreira", 
+                iconClass: "fas fa-hard-hat", 
+                content: `<p>Bem-vindo ao estudo da NR-6. Conforme o item 6.1.1 da norma, um EPI é "todo dispositivo ou produto, de uso individual utilizado pelo trabalhador, destinado à proteção de riscos suscetíveis de ameaçar a segurança e a saúde no trabalho".</p><p>Para o bombeiro civil, essa definição se traduz nos equipamentos que são sua armadura em campo: capacetes, luvas, botas e máscaras respiratórias. Eles são a sua última barreira de proteção. Um exemplo claro é o uso de capacetes em resgates em fábricas, que evitam lesões graves por quedas de objetos. O uso correto de EPIs não é apenas uma obrigação legal, mas parte de uma cultura de segurança que preserva sua vida.</p><hr class="my-6 border-gray-300"><h3 class="text-xl font-semibold mb-4 text-blue-700">Exercícios de Fixação</h3><p class="font-semibold mb-2">1. Segundo a NR-6, o que é um EPI?</p><div class="quiz-options-group" data-module-id="module1"><div class="quiz-option" data-question="module1-q1" data-answer="a">a) Uma ferramenta de uso coletivo para manutenção.</div><div class="quiz-option" data-question="module1-q1" data-answer="b">b) Um dispositivo de uso individual para proteção contra riscos.</div><div class="quiz-option" data-question="module1-q1" data-answer="c">c) Um equipamento para produção industrial.</div></div><p id="explanation-module1-q1" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">2. Qual equipamento é um exemplo de EPI essencial para evitar lesões por queda de objetos em fábricas?</p><div class="quiz-options-group" data-module-id="module1"><div class="quiz-option" data-question="module1-q2" data-answer="a">a) Luvas de proteção.</div><div class="quiz-option" data-question="module1-q2" data-answer="b">b) Óculos de segurança.</div><div class="quiz-option" data-question="module1-q2" data-answer="c">c) Capacete.</div></div><p id="explanation-module1-q2" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">3. Qual item da norma contém a definição oficial de EPI?</p><div class="quiz-options-group" data-module-id="module1"><div class="quiz-option" data-question="module1-q3" data-answer="a">a) Item 6.2.1.</div><div class="quiz-option" data-question="module1-q3" data-answer="b">b) Item 6.1.1.</div><div class="quiz-option" data-question="module1-q3" data-answer="c">c) Item 6.3.1.</div></div><p id="explanation-module1-q3" class="explanation hidden"></p>` 
+            },
+            module2: { 
+                id: "module2", 
+                title: "2. Legislação e Responsabilidades", 
+                iconClass: "fas fa-gavel", 
+                content: `<p>Conhecer as regras é fundamental para garantir a segurança. Este módulo detalha as responsabilidades legais que a NR-6 estabelece para cada parte, conforme o item 6.2.1.</p><h4>Responsabilidades do Empregador:</h4><ul><li>Fornecer aos trabalhadores, gratuitamente, o EPI adequado ao risco.</li><li>Exigir o seu uso.</li><li>Orientar e treinar o trabalhador sobre o uso, guarda e conservação.</li><li>Substituir o EPI imediatamente quando danificado ou extraviado.</li></ul><h4>Responsabilidades do Trabalhador (Empregado):</h4><ul><li>Usar o EPI, utilizando-o apenas para a finalidade a que se destina.</li><li>Responsabilizar-se pela guarda e conservação.</li><li>Comunicar ao empregador qualquer alteração que o torne impróprio para uso.</li></ul><hr class="my-6 border-gray-300"><h3 class="text-xl font-semibold mb-4 text-blue-700">Exercícios de Fixação</h3><p class="font-semibold mb-2">1. De quem é a responsabilidade de fornecer os EPIs aos trabalhadores?</p><div class="quiz-options-group" data-module-id="module2"><div class="quiz-option" data-question="module2-q1" data-answer="a">a) Do próprio trabalhador, que deve comprá-los.</div><div class="quiz-option" data-question="module2-q1" data-answer="b">b) Dos fornecedores dos equipamentos.</div><div class="quiz-option" data-question="module2-q1" data-answer="c">c) Do empregador, que deve fornecê-los gratuitamente.</div></div><p id="explanation-module2-q1" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">2. Qual das seguintes é uma responsabilidade do trabalhador em relação ao seu EPI?</p><div class="quiz-options-group" data-module-id="module2"><div class="quiz-option" data-question="module2-q2" data-answer="a">a) Realizar testes de laboratório no equipamento.</div><div class="quiz-option" data-question="module2-q2" data-answer="b">b) Utilizá-lo e zelar por sua guarda e conservação.</div><div class="quiz-option" data-question="module2-q2" data-answer="c">c) Vender o equipamento após o uso.</div></div><p id="explanation-module2-q2" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">3. Qual item da NR-6 estabelece as responsabilidades de empregadores e trabalhadores?</p><div class="quiz-options-group" data-module-id="module2"><div class="quiz-option" data-question="module2-q3" data-answer="a">a) Anexo I.</div><div class="quiz-option" data-question="module2-q3" data-answer="b">b) Item 6.2.1.</div><div class="quiz-option" data-question="module2-q3" data-answer="c">c) Item 6.1.1.</div></div><p id="explanation-module2-q3" class="explanation hidden"></p>` 
+            },
+            module3: { 
+                id: "module3", 
+                title: "3. O Certificado de Aprovação (CA)", 
+                iconClass: "fas fa-stamp", 
+                content: `<p>Como saber se um capacete ou uma luva realmente oferece a proteção que promete? A resposta está em três letras: CA, o Certificado de Aprovação. Este selo de qualidade é a garantia de que o seu equipamento foi testado e aprovado.</p><p>De acordo com a NR-6, todo e qualquer EPI, seja de fabricação nacional ou importado, só pode ser posto à venda ou utilizado se possuir o CA. O número do CA deve estar gravado de forma visível no EPI, permitindo rastrear o fabricante e a validade. Usar EPIs sem CA válido é uma infração grave.</p><hr class="my-6 border-gray-300"><h3 class="text-xl font-semibold mb-4 text-blue-700">Exercícios de Fixação</h3><p class="font-semibold mb-2">1. O que significa a sigla CA em um EPI?</p><div class="quiz-options-group" data-module-id="module3"><div class="quiz-option" data-question="module3-q1" data-answer="a">a) Controle de Acesso.</div><div class="quiz-option" data-question="module3-q1" data-answer="b">b) Certificado de Aprovação.</div><div class="quiz-option" data-question="module3-q1" data-answer="c">c) Categoria Avançada.</div></div><p id="explanation-module3-q1" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">2. Qual é a principal função do Certificado de Aprovação (CA)?</p><div class="quiz-options-group" data-module-id="module3"><div class="quiz-option" data-question="module3-q2" data-answer="a">a) Garantir que o EPI foi testado e aprovado para sua finalidade.</div><div class="quiz-option" data-question="module3-q2" data-answer="b">b) Informar o preço de varejo do equipamento.</div><div class="quiz-option" data-question="module3-q2" data-answer="c">c) Servir como um manual de instruções do EPI.</div></div><p id="explanation-module3-q2" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">3. Um EPI pode ser comercializado ou utilizado sem possuir um CA válido?</p><div class="quiz-options-group" data-module-id="module3"><div class="quiz-option" data-question="module3-q3" data-answer="a">a) Sim, se for importado.</div><div class="quiz-option" data-question="module3-q3" data-answer="b">b) Sim, se o empregador autorizar.</div><div class="quiz-option" data-question="module3-q3" data-answer="c">c) Não, é uma exigência legal da NR-6.</div></div><p id="explanation-module3-q3" class="explanation hidden"></p>` 
+            },
+            module4: { 
+                id: "module4", 
+                title: "4. Proteção da Cabeça, Olhos e Face", 
+                iconClass: "fas fa-eye", 
+                content: `<p>A proteção da cabeça é uma das prioridades em qualquer cenário de resgate. O capacete tem como função primária proteger o crânio contra impactos de objetos que possam cair, bem como contra batidas da cabeça contra estruturas fixas. Em um desabamento, onde há risco constante de queda de materiais, o capacete é o que evita lesões fatais.</p><p>Conforme o Anexo I da NR-6, existem diferentes tipos de capacetes. Para bombeiros e eletricistas, por exemplo, os capacetes também oferecem proteção contra choques elétricos. Além deles, temos os óculos de proteção (contra partículas e respingos) e as viseiras de proteção facial (proteção ampla para toda a face).</p><hr class="my-6 border-gray-300"><h3 class="text-xl font-semibold mb-4 text-blue-700">Exercícios de Fixação</h3><p class="font-semibold mb-2">1. Qual é a principal função de um capacete em um resgate em fábrica?</p><div class="quiz-options-group" data-module-id="module4"><div class="quiz-option" data-question="module4-q1" data-answer="a">a) Proteger contra ruído excessivo.</div><div class="quiz-option" data-question="module4-q1" data-answer="b">b) Evitar lesões por quedas de objetos.</div><div class="quiz-option" data-question="module4-q1" data-answer="c">c) Proteger contra a inalação de fumaça.</div></div><p id="explanation-module4-q1" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">2. Onde, na NR-6, podemos encontrar a lista geral dos tipos de EPIs?</p><div class="quiz-options-group" data-module-id="module4"><div class="quiz-option" data-question="module4-q2" data-answer="a">a) No item 6.1.</div><div class="quiz-option" data-question="module4-q2" data-answer="b">b) No Anexo I.</div><div class="quiz-option" data-question="module4-q2" data-answer="c">c) No item 6.3.</div></div><p id="explanation-module4-q2" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">3. Além de impacto, os capacetes podem oferecer proteção contra quais outros riscos?</p><div class="quiz-options-group" data-module-id="module4"><div class="quiz-option" data-question="module4-q3" data-answer="a">a) Apenas contra o frio.</div><div class="quiz-option" data-question="module4-q3" data-answer="b">b) Contra choques elétricos.</div><div class="quiz-option" data-question="module4-q3" data-answer="c">c) Contra a exposição a produtos químicos.</div></div><p id="explanation-module4-q3" class="explanation hidden"></p>` 
+            },
+            module5: { 
+                id: "module5", 
+                title: "5. Proteção Respiratória: Máscaras e Filtros", 
+                iconClass: "fas fa-lungs", 
+                content: `<p>Em muitos cenários de emergência, o perigo mais letal é invisível: está no ar que se respira. Os Equipamentos de Proteção Respiratória (EPR) são essenciais em ambientes com fumaça, gases tóxicos ou deficiência de oxigênio.</p><p>Os EPRs se dividem em duas grandes categorias:<ul><li><b>Respiradores de Adução de Ar:</b> Fornecem ar respirável de uma fonte independente, como cilindros de ar comprimido (EPRAs). São obrigatórios em ambientes com deficiência de oxigênio.</li><li><b>Respiradores de Purificação de Ar (Filtros):</b> Utilizam filtros mecânicos (poeiras) ou químicos (gases e vapores) para remover contaminantes. Não fornecem oxigênio.</li></ul>A seleção do protetor correto é uma decisão técnica baseada nos riscos. Uma escolha errada pode ser fatal.</p><hr class="my-6 border-gray-300"><h3 class="text-xl font-semibold mb-4 text-blue-700">Exercícios de Fixação</h3><p class="font-semibold mb-2">1. Qual EPI é fundamental para proteger contra a inalação de fumaça em um incêndio?</p><div class="quiz-options-group" data-module-id="module5"><div class="quiz-option" data-question="module5-q1" data-answer="a">a) Uma máscara cirúrgica simples.</div><div class="quiz-option" data-question="module5-q1" data-answer="b">b) Um respirador com filtro mecânico.</div><div class="quiz-option" data-question="module5-q1" data-answer="c">c) Uma máscara respiratória de adução de ar (como o EPRA).</div></div><p id="explanation-module5-q1" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">2. Em um resgate com vapores tóxicos, mas com oxigênio, qual proteção é indicada?</p><div class="quiz-options-group" data-module-id="module5"><div class="quiz-option" data-question="module5-q2" data-answer="a">a) Uma máscara filtrante com filtro químico adequado.</div><div class="quiz-option" data-question="module5-q2" data-answer="b">b) Um respirador autônomo de ar comprimido.</div><div class="quiz-option" data-question="module5-q2" data-answer="c">c) Uma máscara para poeiras.</div></div><p id="explanation-module5-q2" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">3. Respiradores com filtros podem ser utilizados em ambientes com deficiência de oxigênio?</p><div class="quiz-options-group" data-module-id="module5"><div class="quiz-option" data-question="module5-q3" data-answer="a">a) Sim, desde que o filtro seja novo.</div><div class="quiz-option" data-question="module5-q3" data-answer="b">b) Não, pois eles apenas purificam o ar e não fornecem oxigênio.</div><div class="quiz-option" data-question="module5-q3" data-answer="c">c) Sim, mas por um período máximo de 15 minutos.</div></div><p id="explanation-module5-q3" class="explanation hidden"></p>` 
+            },
+            module6: { 
+                id: "module6", 
+                title: "6. Proteção de Tronco e Membros", 
+                iconClass: "fas fa-user-shield", 
+                content: `<p>A proteção do bombeiro civil deve ser completa. Este módulo aborda os EPIs para tronco, braços, mãos, pernas e pés.<ul><li><b>Proteção do Tronco:</b> Inclui vestimentas especiais de aproximação e combate a incêndio, que oferecem proteção contra calor, chamas e respingos de produtos químicos.</li><li><b>Proteção de Membros Superiores:</b> Luvas são essenciais. Existem luvas térmicas (altas temperaturas), de proteção química (produtos corrosivos) e contra corte e abrasão (manuseio de escombros).</li><li><b>Proteção de Membros Inferiores:</b> As botas de segurança são obrigatórias, oferecendo proteção contra impacto, perfuração e podendo ter características como isolamento elétrico (dielétricas).</li></ul></p><hr class="my-6 border-gray-300"><h3 class="text-xl font-semibold mb-4 text-blue-700">Exercícios de Fixação</h3><p class="font-semibold mb-2">1. Qual EPI é projetado para proteger as mãos em resgates com altas temperaturas?</p><div class="quiz-options-group" data-module-id="module6"><div class="quiz-option" data-question="module6-q1" data-answer="a">a) Luvas de raspa.</div><div class="quiz-option" data-question="module6-q1" data-answer="b">b) Luvas de malha.</div><div class="quiz-option" data-question="module6-q1" data-answer="c">c) Luvas térmicas.</div></div><p id="explanation-module6-q1" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">2. A lista geral de EPIs, incluindo vestimentas e calçados, está presente em qual parte da NR-6?</p><div class="quiz-options-group" data-module-id="module6"><div class="quiz-option" data-question="module6-q2" data-answer="a">a) No item 6.3.</div><div class="quiz-option" data-question="module6-q2" data-answer="b">b) No Anexo I.</div><div class="quiz-option" data-question="module6-q2" data-answer="c">c) No item 6.7.</div></div><p id="explanation-module6-q2" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">3. As vestimentas de combate a incêndio oferecem proteção principalmente contra qual tipo de risco?</p><div class="quiz-options-group" data-module-id="module6"><div class="quiz-option" data-question="module6-q3" data-answer="a">a) Ruído e vibração.</div><div class="quiz-option" data-question="module6-q3" data-answer="b">b) Calor e chamas.</div><div class="quiz-option" data-question="module6-q3" data-answer="c">c) Poeira e névoa.</div></div><p id="explanation-module6-q3" class="explanation hidden"></p>` 
+            },
+            module7: { 
+                id: "module7", 
+                title: "7. Seleção Estratégica do EPI: Análise de Risco", 
+                iconClass: "fas fa-tasks", 
+                content: `<p>Ter acesso a EPIs não é suficiente; é preciso saber escolher o equipamento certo para o risco certo. Conforme o item 6.3 da norma, a seleção do EPI deve ser baseada nos riscos específicos da atividade.</p><p>O processo começa com uma análise de risco do cenário, onde o bombeiro deve identificar a natureza dos perigos, que são classificados em:<ul><li><b>Riscos Químicos:</b> Exposição a vapores, gases, etc. Exige máscaras e luvas específicas.</li><li><b>Riscos Físicos:</b> Impacto, calor, ruído, eletricidade. Exige capacetes, vestimentas térmicas, etc.</li><li><b>Riscos Biológicos:</b> Contato com sangue e fluidos. Exige luvas de procedimento, máscaras e óculos.</li></ul>Essa avaliação prévia é o que garante que a proteção seja eficaz.</p><hr class="my-6 border-gray-300"><h3 class="text-xl font-semibold mb-4 text-blue-700">Exercícios de Fixação</h3><p class="font-semibold mb-2">1. De acordo com o item 6.3, o que determina a seleção de um EPI?</p><div class="quiz-options-group" data-module-id="module7"><div class="quiz-option" data-question="module7-q1" data-answer="a">a) O custo do equipamento.</div><div class="quiz-option" data-question="module7-q1" data-answer="b">b) A marca do fabricante.</div><div class="quiz-option" data-question="module7-q1" data-answer="c">c) Os riscos específicos da atividade e do ambiente.</div></div><p id="explanation-module7-q1" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">2. Qual tipo de EPI é selecionado para proteger contra vapores químicos?</p><div class="quiz-options-group" data-module-id="module7"><div class="quiz-option" data-question="module7-q2" data-answer="a">a) Um capacete com isolamento térmico.</div><div class="quiz-option" data-question="module7-q2" data-answer="b">b) Uma máscara filtrante com filtro químico.</div><div class="quiz-option" data-question="module7-q2" data-answer="c">c) Luvas térmicas.</div></div><p id="explanation-module7-q2" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">3. O risco de impacto por queda de objetos é classificado como um risco de qual natureza?</p><div class="quiz-options-group" data-module-id="module7"><div class="quiz-option" data-question="module7-q3" data-answer="a">a) Risco Químico.</div><div class="quiz-option" data-question="module7-q3" data-answer="b">b) Risco Biológico.</div><div class="quiz-option" data-question="module7-q3" data-answer="c">c) Risco Físico.</div></div><p id="explanation-module7-q3" class="explanation hidden"></p>` 
+            },
+            module8: { 
+                id: "module8", 
+                title: "8. Uso, Guarda e Higienização do EPI", 
+                iconClass: "fas fa-pump-soap", 
+                content: `<p>A eficácia de um EPI não depende apenas de sua qualidade, mas também de como ele é utilizado e conservado. Este módulo aborda as melhores práticas conforme o item 6.7 da norma.</p><ul><li><b>Uso Correto:</b> Todo EPI deve ser utilizado estritamente de acordo com as instruções do fabricante. Improvisos são proibidos.</li><li><b>Higienização e Cuidados:</b> Os EPIs exigem limpeza e manutenção regulares. Por exemplo, uma máscara respiratória deve ser limpa e desinfetada após o uso para remover fuligem e contaminantes.</li><li><b>Guarda e Armazenamento:</b> O armazenamento correto é crucial. Devem ser guardados em locais secos e protegidos da luz solar. A norma proíbe explicitamente o armazenamento em áreas úmidas.</li></ul></p><hr class="my-6 border-gray-300"><h3 class="text-xl font-semibold mb-4 text-blue-700">Exercícios de Fixação</h3><p class="font-semibold mb-2">1. Como os EPIs devem ser utilizados para garantir a máxima segurança?</p><div class="quiz-options-group" data-module-id="module8"><div class="quiz-option" data-question="module8-q1" data-answer="a">a) Com improvisos, se necessário.</div><div class="quiz-option" data-question="module8-q1" data-answer="b">b) Estritamente conforme as instruções do fabricante.</div><div class="quiz-option" data-question="module8-q1" data-answer="c">c) Sem a necessidade de ajustes.</div></div><p id="explanation-module8-q1" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">2. Onde os EPIs devem ser armazenados para garantir sua conservação?</p><div class="quiz-options-group" data-module-id="module8"><div class="quiz-option" data-question="module8-q2" data-answer="a">a) Em áreas úmidas para manter a flexibilidade.</div><div class="quiz-option" data-question="module8-q2" data-answer="b">b) Em locais secos e protegidos.</div><div class="quiz-option" data-question="module8-q2" data-answer="c">c) Em escritórios, junto a outros materiais.</div></div><p id="explanation-module8-q2" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">3. Qual item da NR-6 regula as diretrizes sobre o uso e o armazenamento dos EPIs?</p><div class="quiz-options-group" data-module-id="module8"><div class="quiz-option" data-question="module8-q3" data-answer="a">a) Item 6.1.</div><div class="quiz-option" data-question="module8-q3" data-answer="b">b) Item 6.7.</div><div class="quiz-option" data-question="module8-q3" data-answer="c">c) Item 6.3.</div></div><p id="explanation-module8-q3" class="explanation hidden"></p>` 
+            },
+            module9: { 
+                id: "module9", 
+                title: "9. Estudos de Caso: Falhas de EPI", 
+                iconClass: "fas fa-exclamation-triangle", 
+                content: `<p>Aprender com os erros é uma ferramenta poderosa. Este módulo analisa casos de acidentes onde a falha ou a ausência de um EPI teve consequências graves.</p><ul><li><b>Caso 1: Lesão por Falta de Capacete.</b> Um bombeiro sofreu uma lesão grave na cabeça por não estar utilizando o capacete. Lição: O uso de EPIs básicos não é opcional.</li><li><b>Caso 2: Exposição a Vapores por Seleção Inadequada.</b> Um trabalhador foi exposto a vapores tóxicos por usar a máscara com o filtro químico errado. Lição: Não basta usar qualquer EPI; é preciso selecionar o adequado para o risco específico (item 6.3).</li><li><b>Caso 3: Lesão por Equipamento Danificado.</b> Uma lesão foi causada por uma falha em um capacete danificado. Lição: A inspeção do EPI antes do uso é tão importante quanto o próprio uso (item 6.7).</li></ul></p><hr class="my-6 border-gray-300"><h3 class="text-xl font-semibold mb-4 text-blue-700">Exercícios de Fixação</h3><p class="font-semibold mb-2">1. No primeiro estudo de caso, o que causou a lesão do bombeiro?</p><div class="quiz-options-group" data-module-id="module9"><div class="quiz-option" data-question="module9-q1" data-answer="a">a) A falta de luvas.</div><div class="quiz-option" data-question="module9-q1" data-answer="b">b) A falta de capacete.</div><div class="quiz-option" data-question="module9-q1" data-answer="c">c) A falta de botas.</div></div><p id="explanation-module9-q1" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">2. Qual foi a principal lição no caso da exposição a vapores tóxicos?</p><div class="quiz-options-group" data-module-id="module9"><div class="quiz-option" data-question="module9-q2" data-answer="a">a) A importância de aumentar a ventilação do local.</div><div class="quiz-option" data-question="module9-q2" data-answer="b">b) A necessidade crítica de selecionar o EPI adequado para cada tipo de risco.</div><div class="quiz-option" data-question="module9-q2" data-answer="c">c) A obrigação de reduzir a temperatura do ambiente.</div></div><p id="explanation-module9-q2" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">3. O que a lesão causada por um capacete danificado nos ensina?</p><div class="quiz-options-group" data-module-id="module9"><div class="quiz-option" data-question="module9-q3" data-answer="a">a) Que capacetes são frágeis e devem ser evitados.</div><div class="quiz-option" data-question="module9-q3" data-answer="b">b) A importância de verificar as condições do EPI antes de cada uso.</div><div class="quiz-option" data-question="module9-q3" data-answer="c">c) Que a cor do capacete influencia sua resistência.</div></div><p id="explanation-module9-q3" class="explanation hidden"></p>` 
+            },
+            module10: { 
+                id: "module10", 
+                title: "10. Treinamento e Certificação", 
+                iconClass: "fas fa-certificate", 
+                content: `<p>O ciclo da segurança se fecha com o conhecimento. Este módulo final aborda a importância do treinamento contínuo. A NR-6 estabelece que o empregador deve promover treinamento teórico para os trabalhadores sobre o uso correto, a guarda e a conservação dos EPIs.</p><p>Ao concluir este curso, sua capacitação será formalmente reconhecida. O texto menciona que para a emissão de certificado, é necessária uma taxa de aprovação de, no mínimo, 80% nos testes. O certificado é assinado por um profissional qualificado, como um técnico em segurança do trabalho, comprovando que você adquiriu o conhecimento teórico necessário para a gestão e o uso seguro dos EPIs.</p><hr class="my-6 border-gray-300"><h3 class="text-xl font-semibold mb-4 text-blue-700">Exercícios de Fixação</h3><p class="font-semibold mb-2">1. O que a NR-6 exige que os empregadores forneçam aos trabalhadores?</p><div class="quiz-options-group" data-module-id="module10"><div class="quiz-option" data-question="module10-q1" data-answer="a">a) Apenas os manuais de instrução.</div><div class="quiz-option" data-question="module10-q1" data-answer="b">b) Treinamento teórico sobre uso, guarda e conservação.</div><div class="quiz-option" data-question="module10-q1" data-answer="c">c) Um aumento salarial pelo risco.</div></div><p id="explanation-module10-q1" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">2. Segundo o texto, qual a taxa de aprovação mencionada como exemplo para a emissão de um certificado?</p><div class="quiz-options-group" data-module-id="module10"><div class="quiz-option" data-question="module10-q2" data-answer="a">a) 50%.</div><div class="quiz-option" data-question="module10-q2" data-answer="b">b) 70%.</div><div class="quiz-option" data-question="module10-q2" data-answer="c">c) 80%.</div></div><p id="explanation-module10-q2" class="explanation hidden"></p><p class="font-semibold mt-4 mb-2">3. Quem é o profissional qualificado para assinar o certificado de conclusão do curso?</p><div class="quiz-options-group" data-module-id="module10"><div class="quiz-option" data-question="module10-q3" data-answer="a">a) Um engenheiro mecânico.</div><div class="quiz-option" data-question="module10-q3" data-answer="b">b) Um técnico em segurança do trabalho.</div><div class="quiz-option" data-question="module10-q3" data-answer="c">c) Um gerente de produção.</div></div><p id="explanation-module10-q3" class="explanation hidden"></p>` 
+            },
+            finalExam: { 
+                id: "finalExam", 
+                title: "Prova Final - NR-6", 
+                iconClass: "fas fa-graduation-cap", 
+                content: `<p>Você concluiu todos os módulos do curso! Agora é hora de testar seus conhecimentos com a prova final. Você precisa de no mínimo 6 acertos para ser aprovado.</p><div id="exam-questions" class="mt-6"></div><div id="exam-result" class="mt-6 text-lg font-semibold"></div><div class="mt-8 pt-6 border-t border-gray-200 text-right"><button id="submit-exam-button" class="action-button">Corrigir Prova</button><button id="retake-exam-button" class="action-button hidden ml-4">Fazer Novamente</button></div>` 
+            }
+        };
+
+        const finalExamQuestions = [
+            { question: "Qual é a principal definição de EPI segundo o item 6.1.1 da NR-6?", options: ["Qualquer ferramenta de trabalho", "Um dispositivo individual para proteção contra riscos", "Um uniforme padrão da empresa", "Um equipamento de uso coletivo"], correct: "b" },
+            { question: "De quem é a responsabilidade de comunicar ao empregador qualquer alteração que torne o EPI impróprio para uso?", options: ["Apenas do empregador", "Do trabalhador", "De uma empresa terceirizada", "Do fabricante"], correct: "b" },
+            { question: "O que o Certificado de Aprovação (CA) garante?", options: ["O menor preço do mercado", "Que o EPI tem um design moderno", "Que o equipamento foi testado e aprovado para o risco", "Que o EPI tem garantia vitalícia"], correct: "c" },
+            { question: "Para proteção contra respingos de produtos químicos na face, qual EPI é mais indicado?", options: ["Apenas óculos de proteção", "Capacete com jugular", "Viseira de proteção (protetor facial)", "Máscara de tecido"], correct: "c" },
+            { question: "Em um ambiente com deficiência de oxigênio, qual tipo de protetor respiratório é obrigatório?", options: ["Máscara com filtro químico", "Respirador de adução de ar (ex: EPRA)", "Máscara com filtro mecânico", "Qualquer máscara com CA"], correct: "b" },
+            { question: "Botas de segurança com a classificação 'dielétrica' oferecem proteção contra:", options: ["Perfuração por pregos", "Altas temperaturas", "Produtos químicos corrosivos", "Choques elétricos"], correct: "d" },
+            { question: "Qual é o primeiro passo para a seleção correta de um EPI, de acordo com o item 6.3 da NR-6?", options: ["Verificar o custo do equipamento", "Realizar uma análise de risco do ambiente", "Consultar a preferência do trabalhador", "Escolher a marca mais conhecida"], correct: "b" },
+            { question: "Onde é estritamente proibido armazenar EPIs para evitar sua degradação?", options: ["Em armários de metal", "Em locais com muita luz", "Em áreas úmidas", "Em caixas de plástico"], correct: "c" },
+            { question: "O que a lição do 'Caso 3: Lesão por Equipamento Danificado' nos ensina sobre a rotina de segurança?", options: ["Que EPIs devem ser trocados anualmente", "A importância da inspeção do EPI antes de cada uso", "Que apenas o chefe de equipe pode inspecionar os EPIs", "Que equipamentos danificados podem ser consertados com fita adesiva"], correct: "b" },
+            { question: "De acordo com o Módulo 10, o que a NR-6 exige que o empregador promova para os trabalhadores?", options: ["A compra de EPIs com desconto", "Treinamento teórico sobre o uso, guarda e conservação do EPI", "Uma bonificação salarial pelo uso de EPI", "Apenas a entrega de um manual de instruções"], correct: "b" },
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const contentArea = document.getElementById('content-area');
+            const moduleSelector = document.getElementById('module-selector');
+
+            // Verifica se os elementos essenciais estão presentes
+            if (!contentArea || !moduleSelector) {
+                console.error('Erro: Elementos #content-area ou #module-selector não encontrados no DOM.');
+                return;
+            }
+
+            // Adiciona o botão de concluir dinamicamente para os módulos
+            for (const moduleId in moduleContent) {
+                if (moduleContent.hasOwnProperty(moduleId) && moduleId.startsWith('module')) {
+                    moduleContent[moduleId].content += `<div class="mt-8 pt-6 border-t border-gray-200 text-right"><button id="conclude-btn-${moduleId}" class="action-button conclude-button" data-module="${moduleId}" disabled>Concluir Módulo</button></div>`;
+                }
+            }
+
+            function populateModuleSelector() {
+                console.log('Populando seletor de módulos...');
+                moduleSelector.innerHTML = '<option value="">Escolha um Módulo</option>'; // Reseta o seletor
+                Object.values(moduleContent).forEach(module => {
+                    if (module.id) {
+                        const option = document.createElement('option');
+                        option.value = module.id;
+                        option.textContent = module.title;
+                        if (module.id === 'finalExam') {
+                            option.id = 'final-exam-option';
+                            option.disabled = true;
+                        }
+                        moduleSelector.appendChild(option);
+                    }
+                });
+                console.log('Seletor de módulos preenchido com', moduleSelector.options.length - 1, 'módulos.');
+            }
+
+            function updateProgress() {
+                const moduleCompletions = completedModules.filter(id => id.startsWith('module')).length;
+                const progress = totalModules > 0 ? (moduleCompletions / totalModules) * 100 : 0;
+                document.getElementById('progress-text').textContent = `${progress.toFixed(0)}%`;
+                document.getElementById('progress-bar').style.width = `${progress}%`;
+                localStorage.setItem('gateBombeiroNR6CompletedModules', JSON.stringify(completedModules));
+
+                const finalExamOption = document.getElementById('final-exam-option');
+                if (finalExamOption) {
+                    if (moduleCompletions >= totalModules) {
+                        finalExamOption.disabled = false;
+                        if (!finalExamOption.textContent.includes('(Liberada!)')) {
+                            finalExamOption.textContent += " (Liberada!)";
+                        }
+                    } else {
+                        finalExamOption.disabled = true;
+                        finalExamOption.textContent = "Prova Final - NR-6";
+                    }
+                }
+            }
+
+            function markModuleCompleted(moduleId) {
+                if (!completedModules.includes(moduleId)) {
+                    completedModules.push(moduleId);
+                    updateProgress();
+                    console.log(`Módulo ${moduleId} marcado como concluído.`);
+                }
+            }
+
+            function checkModuleStatus(moduleId) {
+                if (!moduleId || !moduleContent[moduleId]) {
+                    console.error(`Erro: Módulo ${moduleId} não encontrado.`);
+                    return;
+                }
+
+                const concludeButton = document.getElementById(`conclude-btn-${moduleId}`);
+                if (!concludeButton || completedModules.includes(moduleId)) {
+                    if (concludeButton) {
+                        concludeButton.disabled = true;
+                        concludeButton.textContent = 'Módulo Concluído';
+                    }
+                    return;
+                }
+
+                // Removida a verificação de respostas para habilitar o botão imediatamente
+                concludeButton.disabled = false;
+                const moduleNumber = moduleContent[moduleId].title.split('.')[0];
+                concludeButton.textContent = `Concluir Módulo ${moduleNumber}`;
+            }
+
+            function setupQuizListeners(moduleId) {
+                const moduleGroups = contentArea.querySelectorAll(`.quiz-options-group[data-module-id="${moduleId}"]`);
+                moduleGroups.forEach(group => {
+                    const options = group.querySelectorAll('.quiz-option:not([data-listener-added])');
+                    options.forEach(option => {
+                        option.setAttribute('data-listener-added', 'true');
+                        option.addEventListener('click', () => {
+                            const questionId = option.dataset.question;
+                            if (option.disabled) return;
+
+                            const allOptionsInGroup = group.querySelectorAll(`.quiz-option[data-question="${questionId}"]`);
+                            allOptionsInGroup.forEach(opt => opt.disabled = true);
+
+                            const selectedAnswer = option.dataset.answer;
+                            const actualCorrectAnswer = correctAnswers[questionId];
+                            const explanationP = document.getElementById(`explanation-${questionId}`);
+
+                            if (selectedAnswer === actualCorrectAnswer) {
+                                option.classList.add('correct');
+                                explanationP.innerHTML = `<strong class="text-green-700">Correto!</strong>`;
+                                quizAnswers[questionId] = selectedAnswer;
+                            } else {
+                                option.classList.add('incorrect');
+                                const correctOptionEl = group.querySelector(`.quiz-option[data-answer="${actualCorrectAnswer}"]`);
+                                correctOptionEl.classList.add('correct');
+                                explanationP.innerHTML = `<strong class="text-red-700">Incorreto.</strong> A resposta correta foi destacada em verde.`;
+                                quizAnswers[questionId] = selectedAnswer;
+                            }
+                            explanationP.classList.remove('hidden');
+                            localStorage.setItem('gateBombeiroNR6QuizAnswers', JSON.stringify(quizAnswers));
+                            checkModuleStatus(moduleId);
+                        });
+                    });
+                });
+            }
+
+            function restoreQuizState(moduleId) {
+                const questionsInModule = Object.keys(correctAnswers).filter(key => key.startsWith(moduleId));
+                questionsInModule.forEach(qid => {
+                    if (quizAnswers[qid]) {
+                        const questionGroup = contentArea.querySelector(`.quiz-option[data-question="${qid}"]`)?.closest('.quiz-options-group');
+                        if (!questionGroup) return;
+
+                        const allOptionsInGroup = questionGroup.querySelectorAll(`.quiz-option[data-question="${qid}"]`);
+                        allOptionsInGroup.forEach(opt => {
+                            opt.disabled = true;
+                            if (opt.dataset.answer === correctAnswers[qid]) {
+                                opt.classList.add('correct');
+                                if (quizAnswers[qid] === 'correct' || quizAnswers[qid] === opt.dataset.answer) {
+                                    opt.classList.add('selected');
+                                }
+                            } else if (quizAnswers[qid] !== 'correct' && quizAnswers[qid] !== 'incorrect' && opt.dataset.answer === quizAnswers[qid]) {
+                                opt.classList.add('incorrect');
+                            }
+                        });
+
+                        const explanationP = document.getElementById(`explanation-${qid}`);
+                        if (explanationP) {
+                            const isCorrect = quizAnswers[qid] === 'correct' || quizAnswers[qid] === correctAnswers[qid];
+                            explanationP.innerHTML = isCorrect
+                                ? `<strong class="text-green-700">Correto!</strong>`
+                                : `<strong class="text-red-700">Incorreto.</strong> A resposta correta foi destacada em verde.`;
+                            explanationP.classList.remove('hidden');
+                        }
+                    }
+                });
+            }
+
+            function setupConcludeButtonListener(moduleId) {
+                const button = document.getElementById(`conclude-btn-${moduleId}`);
+                if (button) {
+                    button.addEventListener('click', () => {
+                        markModuleCompleted(moduleId);
+                        button.disabled = true;
+                        button.textContent = 'Módulo Concluído';
+                    });
+                }
+            }
+
+            function loadModuleContent(moduleId) {
+                console.log(`Carregando conteúdo do módulo: ${moduleId || 'initial'}`);
+                if (!contentArea) {
+                    console.error('Erro: #content-area não encontrado.');
+                    return;
+                }
+                contentArea.classList.add('fade');
+                setTimeout(() => {
+                    const moduleData = moduleContent[moduleId] || moduleContent['initial'];
+                    contentArea.innerHTML = `<h2 class="text-2xl font-semibold mb-6 flex items-center text-blue-800"><i class="${moduleData.iconClass} mr-3 text-orange-500 fa-fw"></i>${moduleData.title}</h2><div>${moduleData.content}</div>`;
+                    
+                    if (moduleId && moduleId.startsWith('module')) {
+                        setupQuizListeners(moduleId);
+                        setupConcludeButtonListener(moduleId);
+                        restoreQuizState(moduleId);
+                        checkModuleStatus(moduleId);
+                    } else if (moduleId === 'finalExam') {
+                        renderFinalExam();
+                    }
+                    
+                    contentArea.classList.remove('fade');
+                    console.log(`Conteúdo do módulo ${moduleId || 'initial'} carregado com sucesso.`);
+                }, 300);
+            }
+
+            function renderFinalExam() {
+                const examContainer = document.getElementById('exam-questions');
+                examContainer.innerHTML = finalExamQuestions.map((q, index) => `
+                    <div class="mb-6">
+                        <p class="font-semibold mb-2">${index + 1}. ${q.question}</p>
+                        <div class="quiz-options-group" data-exam-question-id="${index}">
+                            ${q.options.map((opt, i) => `<div class="quiz-option" data-answer="${String.fromCharCode(97 + i)}">${String.fromCharCode(97 + i)}) ${opt}</div>`).join('')}
+                        </div>
+                    </div>
+                `).join('');
+                
+                examContainer.querySelectorAll('.quiz-option').forEach(option => {
+                    option.addEventListener('click', () => {
+                        if (option.parentElement.classList.contains('answered')) return;
+                        option.parentElement.querySelectorAll('.quiz-option').forEach(opt => opt.classList.remove('selected'));
+                        option.classList.add('selected');
+                    });
+                });
+
+                document.getElementById('submit-exam-button').addEventListener('click', gradeExam);
+                document.getElementById('retake-exam-button').addEventListener('click', renderFinalExam);
+            }
+
+            function gradeExam() {
+                let score = 0;
+                finalExamQuestions.forEach((q, index) => {
+                    const questionGroup = contentArea.querySelector(`.quiz-options-group[data-exam-question-id="${index}"]`);
+                    const selectedOption = questionGroup.querySelector('.quiz-option.selected');
+                    questionGroup.classList.add('answered');
+                    if (selectedOption) {
+                        if (selectedOption.dataset.answer === q.correct) {
+                            score++;
+                            selectedOption.classList.add('correct');
+                        } else {
+                            selectedOption.classList.add('incorrect');
+                            const correctOpt = questionGroup.querySelector(`.quiz-option[data-answer="${q.correct}"]`);
+                            if (correctOpt) correctOpt.classList.add('correct');
+                        }
+                    }
+                });
+
+                const resultContainer = document.getElementById('exam-result');
+                const retakeButton = document.getElementById('retake-exam-button');
+                document.getElementById('submit-exam-button').style.display = 'none';
+                
+                if (score >= 6) {
+                    resultContainer.innerHTML = `<span class="text-green-600">APROVADO!</span> Sua nota: ${score}/10.`;
+                    retakeButton.style.display = 'none';
+                    if (!completedModules.includes('finalExam')) {
+                        markModuleCompleted('finalExam');
+                        showCongratulations();
+                        launchConfetti();
+                        showCertificateForm();
+                    }
+                } else {
+                    resultContainer.innerHTML = `<span class="text-red-600">REPROVADO.</span> Sua nota: ${score}/10.`;
+                    retakeButton.classList.remove('hidden');
+                }
+            }
+
+            function showCongratulations() {
+                const congratsMessage = document.getElementById('congratulations-message');
+                congratsMessage.classList.remove('hidden');
+                setTimeout(() => congratsMessage.classList.add('show'), 100);
+            }
+
+            function launchConfetti() {
+                confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 }, zIndex: 9999 });
+            }
+
+            function showCertificateForm() {
+                const formContainer = document.getElementById('certificate-form-container');
+                formContainer.classList.add('show');
+                formContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            document.getElementById('close-congrats').addEventListener('click', () => {
+                document.getElementById('congratulations-message').classList.remove('show');
+            });
+
+            document.getElementById('submit-certificate').addEventListener('click', () => {
+                const name = document.getElementById('full-name').value;
+                const cpf = document.getElementById('cpf').value;
+                const email = document.getElementById('email').value;
+                if (name && cpf && email) {
+                    alert(`Solicitação enviada!\nNome: ${name}\nCPF: ${cpf}\nE-mail: ${email}\nEntraremos em contato em breve.`);
+                } else {
+                    alert('Por favor, preencha todos os campos obrigatórios.');
+                }
+            });
+
+            moduleSelector.addEventListener('change', (event) => {
+                loadModuleContent(event.target.value);
+            });
+
+            // Inicialização
+            console.log('Inicializando curso...');
+            populateModuleSelector();
+            updateProgress();
+            loadModuleContent('');
+        });
+    </script>
+</body>
+</html>
